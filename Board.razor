@@ -1,0 +1,127 @@
+@page "/"
+@rendermode InteractiveServer
+@inject GameState State
+
+<PageTitle>Connect Four</PageTitle>
+
+<h1 class="cf-title">Connect Four</h1>
+
+<div class="cf-layout">
+    <div class="cf-game">
+        <div class="cf-status" role="status" aria-live="polite">
+            @StatusMessage
+        </div>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="cf-error" role="alert">@errorMessage</div>
+        }
+
+        <div class="cf-board" role="grid" aria-label="Connect Four board">
+            @* Drop buttons — one per column *@
+            <div class="cf-drop-row">
+                @for (var c = 0; c < 7; c++)
+                {
+                    var col = c;
+                    <button class="cf-drop"
+                            @onclick="() => PlayColumn(col)"
+                            disabled="@(GameOver || ColumnFull(col))"
+                            aria-label="@($"Drop a piece in column {col + 1}")">
+                        ▼
+                    </button>
+                }
+            </div>
+
+            @* 42 cells: 7 columns x 6 rows *@
+            <div class="cf-grid">
+                @for (var i = 0; i < 42; i++)
+                {
+                    var index = i;
+                    <div class="cf-cell" role="gridcell">
+                        <span class="cf-piece @ColorClass(index) @(index == lastDrop ? "cf-drop-anim" : "")"
+                              aria-label="@CellLabel(index)"></span>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="cf-controls">
+            <button class="cf-btn" @onclick="Reset">New game</button>
+        </div>
+    </div>
+
+    @* ADDITIONAL FEATURE: live move history for the current game *@
+    <aside class="cf-history" aria-label="Move history">
+        <h2>Move history</h2>
+        @if (State.Moves.Count == 0)
+        {
+            <p class="cf-history-empty">No moves yet. Drop a piece to begin!</p>
+        }
+        else
+        {
+            <ol class="cf-move-list">
+                @foreach (var move in State.Moves)
+                {
+                    <li>
+                        <span class="cf-chip @(move.Color == PieceColor.Red ? "cf-red" : "cf-yellow")"></span>
+                        <span class="cf-move-text">
+                            Player @move.Player dropped into column @move.Column
+                            <span class="cf-muted">(row @move.Row)</span>
+                        </span>
+                    </li>
+                }
+            </ol>
+        }
+    </aside>
+</div>
+
+@code {
+    private string errorMessage = string.Empty;
+    private int lastDrop = -1;
+
+    private bool GameOver => State.WinnerColor != PieceColor.Blank || State.IsDraw;
+
+    private string StatusMessage => State.WinnerColor switch
+    {
+        PieceColor.Red => "🔴 Player 1 (Red) wins!",
+        PieceColor.Yellow => "🟡 Player 2 (Yellow) wins!",
+        _ when State.IsDraw => "It's a draw — the board is full.",
+        _ => $"{(State.PlayerTurn == 1 ? "🔴 Player 1 (Red)" : "🟡 Player 2 (Yellow)")}'s turn"
+    };
+
+    private bool ColumnFull(int col) => State.TheBoard[col] != PieceColor.Blank;
+
+    private void PlayColumn(int col)
+    {
+        errorMessage = string.Empty;
+        try
+        {
+            lastDrop = State.PlayPiece(col);
+        }
+        catch (ArgumentException ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private void Reset()
+    {
+        State.ResetBoard();
+        errorMessage = string.Empty;
+        lastDrop = -1;
+    }
+
+    private string ColorClass(int index) => State.TheBoard[index] switch
+    {
+        PieceColor.Red => "cf-red",
+        PieceColor.Yellow => "cf-yellow",
+        _ => "cf-blank"
+    };
+
+    private string CellLabel(int index) => State.TheBoard[index] switch
+    {
+        PieceColor.Red => "Red piece",
+        PieceColor.Yellow => "Yellow piece",
+        _ => "Empty slot"
+    };
+}
